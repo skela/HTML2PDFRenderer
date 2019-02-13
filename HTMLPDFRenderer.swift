@@ -48,13 +48,12 @@ extension HTML2PDFRenderer {
 				toPDF pdfURL: URL,
 				paperSize: PaperSize,
 				paperMargins: UIEdgeInsets = .zero,
+			    baseUrl:URL?=nil,
 				delegate: HTML2PDFRendererDelegate? = nil,
 				callback: @escaping Callback = {_, _ in})
 	{
-		guard
-			let w = UIApplication.shared.keyWindow,
-			let accessURL = FileManager.default.documentsURL
-		else { return }
+		guard let w = UIApplication.shared.keyWindow else { return }
+		guard let accessURL = baseUrl ?? FileManager.default.documentsURL else { return }
 
 		let view = UIView(frame: w.bounds)
 		view.alpha = 0
@@ -79,7 +78,7 @@ extension HTML2PDFRenderer {
 			if self.webView?.isLoading ?? false { return }
 			timer.invalidate()
 
-			self.render(webView: webView, toPDF: pdfURL, paperSize: paperSize, delegate: delegate) {
+			self.render(webView: webView, toPDF: pdfURL, paperSize: paperSize,paperMargins:paperMargins, delegate: delegate) {
 				[weak self] pdfURL, pdfError in
 				guard let self = self else { return }
 
