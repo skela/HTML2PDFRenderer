@@ -47,6 +47,7 @@ extension HTML2PDFRenderer {
 	public func render(htmlURL: URL,
 				toPDF pdfURL: URL,
 				paperSize: PaperSize,
+				paperLandscape: Bool = false,
 				paperMargins: UIEdgeInsets = .zero,
 			    baseUrl:URL?=nil,
 				delegate: HTML2PDFRendererDelegate? = nil,
@@ -54,8 +55,18 @@ extension HTML2PDFRenderer {
 	{
 		guard let w = UIApplication.shared.keyWindow else { return }
 		guard let accessURL = baseUrl ?? FileManager.default.documentsURL else { return }
-
-		let view = UIView(frame: w.bounds)
+		
+		let bounds : CGRect
+		if paperLandscape
+		{
+			bounds = CGRect(x:0,y:0,width:w.bounds.height,height:w.bounds.width)
+		}
+		else
+		{
+			bounds = CGRect(x:0,y:0,width:w.bounds.width,height:w.bounds.height)
+		}
+		
+		let view = UIView(frame:bounds)
 		view.alpha = 0
 		w.addSubview(view)
 
@@ -78,7 +89,7 @@ extension HTML2PDFRenderer {
 			if self.webView?.isLoading ?? false { return }
 			timer.invalidate()
 
-			self.render(webView: webView, toPDF: pdfURL, paperSize: paperSize,paperMargins:paperMargins, delegate: delegate) {
+			self.render(webView: webView, toPDF: pdfURL, paperSize: paperSize,paperLandscape:paperLandscape,paperMargins:paperMargins, delegate: delegate) {
 				[weak self] pdfURL, pdfError in
 				guard let self = self else { return }
 
@@ -98,6 +109,7 @@ extension HTML2PDFRenderer {
 	public func render(webView: WKWebView,
 				toPDF pdfURL: URL,
 				paperSize: PaperSize,
+				paperLandscape: Bool = false,
 				paperMargins: UIEdgeInsets = .zero,
 				delegate: HTML2PDFRendererDelegate? = nil,
 				callback: Callback = {_, _ in})
@@ -111,7 +123,13 @@ extension HTML2PDFRenderer {
 		let renderer = UIPrintPageRenderer()
 		renderer.addPrintFormatter(webView.viewPrintFormatter(), startingAtPageAt: 0)
 
-		let paperRect = CGRect(x: 0, y: 0, width: paperSize.size.width, height: paperSize.size.height)
+		let w : CGFloat
+		if paperLandscape { w = paperSize.size.height } else { w = paperSize.size.width }
+		
+		let h : CGFloat
+		if paperLandscape { h = paperSize.size.width } else { h = paperSize.size.height }
+		
+		let paperRect = CGRect(x: 0, y: 0, width: w, height: h)
 		renderer.setValue(paperRect, forKey: Key.paperRect.rawValue)
 
 		var printableRect = paperRect
