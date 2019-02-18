@@ -10,19 +10,21 @@
 
 import UIKit
 
-extension HTML2PDFRenderer {
-	public enum PaperSize {
+extension HTML2PDFRenderer
+{
+	public enum PaperSize
+	{
 		case a4
+		case a3
 		case letter
 
-		var size: CGSize {
-			switch self {
-			case .a4:
-				return CGSize(width: 595.2, height: 841.8)
-
-			case .letter:
-				return CGSize(width: 612, height: 792)
-
+		var size : CGSize
+		{
+			switch self
+			{
+			case .a4: return CGSize(width: 595.2, height: 841.8)
+			case .a3: return CGSize(width: 842, height: 1191)
+			case .letter: return CGSize(width: 612, height: 792)
 			}
 		}
 	}

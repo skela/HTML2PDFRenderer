@@ -83,6 +83,7 @@ extension HTML2PDFRenderer {
 		}
 
 		webLoadingTimer = Timer.every(0.5, {
+//		webLoadingTimer = Timer.every(3.0, {
 			[weak self] timer in
 			guard let self = self else { return }
 
