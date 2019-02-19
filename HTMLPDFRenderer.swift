@@ -19,7 +19,8 @@ public protocol HTML2PDFRendererDelegate: class {
 ///	Uses UIPrintPageRenderer to create PDF file out of HTML web page loaded in WKWebView.
 ///
 /// See `PaperSize` enum for declaration of supported pages. Extend as needed.
-public final class HTML2PDFRenderer {
+public final class HTML2PDFRenderer
+{
 	weak var delegate: HTML2PDFRendererDelegate?
 
 	public typealias Callback = (URL?, Error?) -> Void
@@ -27,7 +28,7 @@ public final class HTML2PDFRenderer {
 	//	Internal
 
 	private var webView: WKWebView?
-	private var webLoadingTimer: Timer?
+	fileprivate var loader : HTML2PDFRendererLoadStrategy?
 }
 
 private extension HTML2PDFRenderer {
@@ -39,7 +40,55 @@ private extension HTML2PDFRenderer {
 	}
 }
 
-extension HTML2PDFRenderer {
+fileprivate protocol HTML2PDFRendererLoadStrategy
+{
+	func start(_ webView:WKWebView,completed:@escaping ()->Void)
+}
+
+fileprivate class HTML2PDFRendererTimerLoader : HTML2PDFRendererLoadStrategy
+{
+	var timer : Timer? = nil
+	
+	func start(_ webView:WKWebView,completed:@escaping ()->Void)
+	{
+		timer = Timer.every(1.0,
+		{ ts in
+			if webView.isLoading { return }
+			ts.invalidate()
+			completed()
+		})
+	}
+}
+
+fileprivate class HTML2PDFRendererJavascriptMessageLoader : NSObject,HTML2PDFRendererLoadStrategy,WKScriptMessageHandler
+{
+	let configuration : WKWebViewConfiguration
+	var completed : (()->Void)? = nil
+	
+	override init()
+	{
+		let config = WKWebViewConfiguration()
+		configuration = config
+		super.init()
+		let userContentController = WKUserContentController()
+		userContentController.add(self,name:"test")
+		config.userContentController = userContentController
+	}
+	
+	func start(_ webView:WKWebView,completed:@escaping ()->Void)
+	{
+		self.completed = completed
+	}
+	
+	func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage)
+	{
+		guard message.name == "test" else { return }
+		completed?()
+	}
+}
+
+extension HTML2PDFRenderer
+{
 	///	Takes the given `htmlURL`, creates hidden `WKWebView`, waits for the web page to load,
 	///	then calls the other method below.
 	///
@@ -69,38 +118,49 @@ extension HTML2PDFRenderer {
 		let view = UIView(frame:bounds)
 		view.alpha = 0
 		w.addSubview(view)
-
-		let webView = WKWebView(frame: view.bounds)
+		
+		loader = HTML2PDFRendererTimerLoader()
+//		loader = HTML2PDFRendererJavascriptMessageLoader()
+		
+		let webView : WKWebView
+		if let ls = loader as? HTML2PDFRendererJavascriptMessageLoader
+		{
+			webView = WKWebView(frame:view.bounds,configuration:ls.configuration)
+		}
+		else
+		{
+			webView = WKWebView(frame:view.bounds)
+		}
+		
 		webView.configuration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
 		view.addSubview(webView)
 		self.webView = webView
-
-		if htmlURL.isFileURL {
+		
+		if htmlURL.isFileURL
+		{
 			webView.loadFileURL(htmlURL, allowingReadAccessTo: accessURL)
-		} else {
+		}
+		else
+		{
 			let req = URLRequest(url: htmlURL)
 			webView.load(req)
 		}
-
-		webLoadingTimer = Timer.every(0.5, {
-//		webLoadingTimer = Timer.every(3.0, {
-			[weak self] timer in
-			guard let self = self else { return }
-
-			if self.webView?.isLoading ?? false { return }
-			timer.invalidate()
-
-			self.render(webView: webView, toPDF: pdfURL, paperSize: paperSize,paperLandscape:paperLandscape,paperMargins:paperMargins, delegate: delegate) {
+		
+		loader?.start(webView)
+		{
+			self.loader = nil
+			
+			self.render(webView: webView, toPDF: pdfURL, paperSize: paperSize,paperLandscape:paperLandscape,paperMargins:paperMargins, delegate: delegate)
+			{
 				[weak self] pdfURL, pdfError in
 				guard let self = self else { return }
-
+				
 				self.webView?.superview?.removeFromSuperview()
 				self.webView = nil
-
+				
 				callback(pdfURL, pdfError)
 			}
-		})
-
+		}
 	}
 
 	///	Takes an existing instance of `WKWebView` and prints into paged PDF with specified paper size.
